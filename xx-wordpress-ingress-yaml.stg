@@ -1,0 +1,42 @@
+/*
+ * Mandatory:
+ *
+ * vars.wordpress.nginx.hosts[]
+ * vars.nginx.clientMaxBodySize
+ *
+ */
+
+xx-wordpress-ingress-yaml(parent, vars) ::= <<
+---
+
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: wordpress-muellerpublic-de
+  namespace: muellerpublic-de
+  labels:
+    app: wordpress
+    tier: frontend
+    deployment: wordpress
+  annotations:
+    <ingressDefaultAnnotations(parent, vars, vars.nginx)>
+spec:
+  <ingressDefaultSpec(parent, vars, vars.wordpress.nginx, "wordpress-muellerpublic-de")>
+
+---
+
+apiVersion: certmanager.k8s.io/v1alpha1
+kind: Certificate
+metadata:
+  name: wordpress-muellerpublic-de
+  namespace: muellerpublic-de
+spec:
+  <certDefaultSpecProd(parent, vars, vars.wordpress.nginx, "wordpress-muellerpublic-de")>
+
+---
+
+<ingressService(parent, vars, vars.wordpress.nginx, "muellerpublic-de", "wordpress", "wordpress-muellerpublic-de")>
+
+---
+
+>>

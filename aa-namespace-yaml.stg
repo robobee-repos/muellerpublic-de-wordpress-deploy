@@ -1,0 +1,14 @@
+/*
+ *
+ */
+
+aa-namespace-yaml(parent, vars) ::= <<
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: muellerpublic-de
+  labels:
+    name: muellerpublic-de
+    group: muellerpublic-de
+
+>>

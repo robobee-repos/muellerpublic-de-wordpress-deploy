@@ -1,0 +1,277 @@
+/*
+ * Mandatory:
+ *
+ * vars.wordpress.image.name
+ * vars.wordpress.image.version
+ * vars.wordpress.php.memoryLimit
+ * vars.wordpress.php.maxExecutionTime
+ * vars.wordpress.php.maxChildren
+ * vars.wordpress.php.startServers
+ * vars.wordpress.php.minSpareServers
+ * vars.wordpress.php.maxSpareServers
+ * vars.wordpress.php.slowlogTimeout
+ * vars.wordpress.php.catchWorkersOutput
+ * vars.wordpress.php.opcacheEnable
+ * vars.wordpress.php.opcacheEnableCLI
+ * vars.wordpress.php.opcacheMemoryConsumption
+ * vars.nginx.image.name
+ * vars.nginx.image.version
+ * vars.nginx.revision
+ * vars.rsync.image.name
+ * vars.rsync.image.version
+ * vars.rsync.ssh.revision
+ * 
+ * Optional:
+ *
+ * vars.wordpress.limits.cpu
+ * vars.wordpress.limits.memory
+ * vars.wordpress.requests.cpu
+ * vars.wordpress.requests.memory
+ * vars.wordpress.affinity.key
+ * vars.wordpress.affinity.name
+ * vars.wordpress.affinity.required
+ * vars.wordpress.allowOnMaster
+ * vars.wordpress.tolerations[].effect
+ * vars.wordpress.tolerations[].key
+ * vars.wordpress.tolerations[].value
+ * vars.nginx.limits.cpu
+ * vars.nginx.limits.memory
+ * vars.nginx.requests.cpu
+ * vars.nginx.requests.memory
+ * vars.rsync.limits.cpu
+ * vars.rsync.limits.memory
+ * vars.rsync.requests.cpu
+ * vars.rsync.requests.memory
+ */
+
+import "robobeerun-templates/_affinities.stg"
+import "robobeerun-templates/_resources.stg"
+import "robobeerun-templates/_tolerations.stg"
+
+/*
+ *
+ */
+cc-wordpress-deploy-yaml(parent, vars) ::= <<
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress
+  namespace: muellerpublic-de
+  labels:
+    app: wordpress
+    tier: frontend
+    group: muellerpublic-de
+spec:
+  ports:
+  - name: "http"
+    port: 8080
+    targetPort: 8080
+  selector:
+    app: wordpress
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wordpress-nginx-config-<vars.wordpress.revision>
+  namespace: muellerpublic-de
+  labels:
+    app: nginx
+    tier: frontend
+    group: muellerpublic-de
+data:
+  nginx.conf: |
+    <nginxDefaults(parent, vars, vars.nginx)>
+    http {
+        <nginxHttpDefaults(parent, vars, vars.wordpress.nginx)>
+        <nginxVirtualHosts(parent, vars, vars.wordpress.nginx.hosts)>
+        server {
+            listen 8080;
+            listen [::]:8080;
+            server_name <first(vars.wordpress.nginx.hosts)>;
+            root /var/www/html;
+            index index.php;
+            <nginxLocationFavicon(parent, vars)>
+            <nginxLocationRobots(parent, vars)>
+            <nginxLocationHidden(parent, vars)>
+            <nginxLocationUpload(parent, vars)>
+            ## All static files will be served directly.
+            location ~* \.(js|css|png|jpg|jpeg|gif|ico)$ {
+                <nginxLocationStaticFilesConfig(parent, vars)>
+            }
+            <nginxRootFastcgiPassLocation(parent, vars, vars.wordpress)>
+            <nginxLocationPhpPingLocation(parent, vars)>
+        }
+    }
+
+---
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: wordpress
+  namespace: muellerpublic-de
+  labels:
+    app: wordpress
+    tier: frontend
+    group: muellerpublic-de
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wordpress
+      tier: frontend
+      group: muellerpublic-de
+  template:
+    metadata:
+      labels:
+        app: wordpress
+        tier: frontend
+        group: muellerpublic-de
+    spec:
+      containers:
+      - image: <vars.wordpress.image.name>:<vars.wordpress.image.version>
+        name: wordpress
+        env:
+        - name: WORDPRESS_DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: db
+              key: wordpress_db
+        - name: WORDPRESS_DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: db
+              key: wordpress_user
+        - name: WORDPRESS_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db
+              key: wordpress_password
+        - name: PHP_MEMORY_LIMIT
+          value: "<vars.wordpress.php.memoryLimit>"
+        - name: PHP_MAX_EXECUTION_TIME
+          value: "<vars.wordpress.php.maxExecutionTime>"
+        - name: PHP_FPM_MAX_CHILDREN
+          value: "<vars.wordpress.php.maxChildren>"
+        - name: PHP_FPM_START_SERVERS
+          value: "<vars.wordpress.php.startServers>"
+        - name: PHP_FPM_MIN_SPARE_SERVERS
+          value: "<vars.wordpress.php.minSpareServers>"
+        - name: PHP_FPM_MAX_SPARE_SERVERS
+          value: "<vars.wordpress.php.maxSpareServers>"
+        - name: PHP_FPM_MAX_REQUESTS
+          value: "<vars.wordpress.php.maxRequests>"
+        - name: PHP_FPM_REQUEST_SLOWLOG_TIMEOUT
+          value: "<vars.wordpress.php.slowlogTimeout>"
+        - name: PHP_FPM_CATCH_WORKERS_OUTPUT
+          value: "<vars.wordpress.php.catchWorkersOutput>"
+        - name: PHP_OPCACHE_ENABLE
+          value: "<vars.wordpress.php.opcacheEnable>"
+        - name: PHP_OPCACHE_ENABLE_CLI
+          value: "<vars.wordpress.php.opcacheEnableCLI>"
+        - name: PHP_OPCACHE_MEMORY_CONSUMPTION
+          value: "<vars.wordpress.php.opcacheMemoryConsumption>"
+        - name: WORDPRESS_DB_HOST
+          value: "db:3306"
+        ports:
+        - containerPort: 9000
+          name: "php"
+        <resourcesGroup(parent, vars, vars.wordpress)>
+        volumeMounts:
+        - mountPath: /var/www/html
+          name: html
+          subPath: html
+      - image: <vars.nginx.image.name>:<vars.nginx.image.version>
+        name: nginx
+        ports:
+        - containerPort: 8080
+          name: "http"
+        <resourcesGroup(parent, vars, vars.nginx)>
+        volumeMounts:
+        - mountPath: /var/www/html
+          name: html
+          subPath: html
+        - mountPath: /nginx-in
+          name: wordpress-nginx-config
+      restartPolicy: Always
+      volumes:
+      - name: html
+        persistentVolumeClaim:
+          claimName: muellerpublic-de
+      - name: wordpress-nginx-config
+        configMap:
+          name: wordpress-nginx-config-<vars.nginx.revision>
+      <tolerationMasterGroup(parent, vars, vars.wordpress.allowOnMaster)>
+      <tolerationsGroup(parent, vars, vars.wordpress.tolerations, vars.wordpress.allowOnMaster)>
+      <affinitiesGroup(parent, vars, vars.wordpress.affinity)>
+
+---
+
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: rsync-wordpress
+  namespace: muellerpublic-de
+  labels:
+    app: rsync-wordpress
+    tier: backup
+    group: muellerpublic-de
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: rsync-wordpress
+      tier: backup
+      group: muellerpublic-de
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: rsync-wordpress
+        tier: backup
+        group: muellerpublic-de
+    spec:
+      containers:
+      - image: <vars.rsync.image.name>:<vars.rsync.image.version>
+        name: rsync-wordpress
+        env:
+        - name: RSYNC_AUTHORIZED_KEY
+          valueFrom:
+            secretKeyRef:
+              name: rsync-ssh-<vars.rsync.ssh.revision>
+              key: auth-key
+        - name: USER
+          value: "root"
+        ports:
+        - containerPort: 2222
+          name: ssh
+        readinessProbe:
+          exec:
+            command:
+            - /readiness.sh
+            - /data/Rakefile
+          initialDelaySeconds: 5
+          timeoutSeconds: 1
+        <resourcesGroup(parent, vars, vars.rsync)>
+        volumeMounts:
+        - mountPath: "/var/www/html"
+          name: data
+          subPath: html
+      restartPolicy: Always
+      volumes:
+      - name: html
+        persistentVolumeClaim:
+          claimName: muellerpublic-de
+      <affinitiesGroup(parent, vars, vars.wordpress.affinity)>
+      <tolerationMasterGroup(parent, vars, vars.wordpress.allowOnMaster)>
+      <tolerationsGroup(parent, vars, vars.wordpress.tolerations, vars.wordpress.allowOnMaster)>
+
+---
+
+>>
