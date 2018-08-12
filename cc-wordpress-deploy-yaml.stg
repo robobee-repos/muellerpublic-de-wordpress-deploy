@@ -14,6 +14,7 @@
  * vars.wordpress.php.opcacheEnable
  * vars.wordpress.php.opcacheEnableCLI
  * vars.wordpress.php.opcacheMemoryConsumption
+ * vars.wordpress.hosts
  * vars.nginx.image.name
  * vars.nginx.image.version
  * vars.nginx.revision
@@ -93,11 +94,11 @@ data:
     <nginxDefaults(parent, vars, vars.nginx)>
     http {
         <nginxHttpDefaults(parent, vars, vars.nginx)>
-        <nginxVirtualHosts(parent, vars, vars.hosts)>
+        <nginxVirtualHosts(parent, vars, vars.wordpress.hosts)>
         server {
             listen 8080;
             listen [::]:8080;
-            server_name <first(vars.hosts)>;
+            server_name <first(vars.wordpress.hosts)>;
             root /var/www/html;
             index index.php;
             <nginxLocationFavicon(parent, vars)>
@@ -216,7 +217,7 @@ spec:
           subPath: html
         - mountPath: /nginx-in
           name: wordpress-nginx-config
-        <nginxReadinessProbe(parent, vars, vars.wordpress.nginx.initialDelaySeconds)>
+        <nginxReadinessProbe(parent, vars, vars.wordpress.nginx)>
       restartPolicy: Always
       volumes:
       - name: html
