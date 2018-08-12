@@ -274,7 +274,7 @@ spec:
           exec:
             command:
             - /readiness.sh
-            - /data/Rakefile
+            - /data/index.php
           initialDelaySeconds: 5
           timeoutSeconds: 1
         <resourcesGroup(parent, vars, vars.rsync)>
@@ -284,7 +284,7 @@ spec:
           subPath: html
       restartPolicy: Always
       volumes:
-      - name: html
+      - name: data
         persistentVolumeClaim:
           claimName: muellerpublic-de
       <affinitiesGroup(parent, vars, vars.wordpress.affinity)>
