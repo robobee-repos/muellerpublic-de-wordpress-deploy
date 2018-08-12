@@ -22,9 +22,9 @@ metadata:
     tier: frontend
     deployment: wordpress
   annotations:
-    <ingressDefaultAnnotations(parent, vars, vars.nginx)>
+    <ingressDefaultAnnotations(vars.nginx)>
 spec:
-  <ingressDefaultSpec(parent, vars, vars.wordpress.nginx, "wordpress-muellerpublic-de")>
+  <ingressDefaultSpec(vars, "wordpress-muellerpublic-de")>
 
 ---
 
