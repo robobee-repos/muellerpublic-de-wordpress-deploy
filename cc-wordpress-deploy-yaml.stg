@@ -92,12 +92,12 @@ data:
   nginx.conf: |
     <nginxDefaults(parent, vars, vars.nginx)>
     http {
-        <nginxHttpDefaults(parent, vars, vars.wordpress.nginx)>
-        <nginxVirtualHosts(parent, vars, vars.wordpress.nginx.hosts)>
+        <nginxHttpDefaults(parent, vars, vars.nginx)>
+        <nginxVirtualHosts(parent, vars, vars.hosts)>
         server {
             listen 8080;
             listen [::]:8080;
-            server_name <first(vars.wordpress.nginx.hosts)>;
+            server_name <first(vars.hosts)>;
             root /var/www/html;
             index index.php;
             <nginxLocationFavicon(parent, vars)>
