@@ -19,7 +19,7 @@
  * vars.db.tolerations[].value
  */
 
-import "robobeerun-templates/_maradns_probe.stg"
+import "robobeerun-templates/_mysql_probe.stg"
 import "robobeerun-templates/_affinities.stg"
 import "robobeerun-templates/_resources.stg"
 import "robobeerun-templates/_tolerations.stg"
