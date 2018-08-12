@@ -38,7 +38,7 @@ metadata:
   name: wordpress-muellerpublic-de
   namespace: muellerpublic-de
 spec:
-  <certDefaultSpecProd(vars.wordpress.nginx, "wordpress-muellerpublic-de")>
+  <certDefaultSpecProd(vars.wordpress, "wordpress-muellerpublic-de")>
 
 ---
 
