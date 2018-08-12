@@ -82,7 +82,7 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: wordpress-nginx-config-<vars.wordpress.revision>
+  name: wordpress-nginx-config-<vars.nginx.revision>
   namespace: muellerpublic-de
   labels:
     app: nginx
