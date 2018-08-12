@@ -191,6 +191,20 @@ spec:
         - mountPath: /var/www/html
           name: html
           subPath: html
+        livenessProbe:
+          tcpSocket:
+            port: 9000
+          initialDelaySeconds: <vars.wordpress.nginx.initialDelaySeconds>
+          periodSeconds: 60
+          timeoutSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: 9000
+          initialDelaySeconds: <vars.wordpress.nginx.initialDelaySeconds>
+          periodSeconds: 60
+          timeoutSeconds: 10
+          periodSeconds: 60
+        timeoutSeconds: 10
       - image: <vars.nginx.image.name>:<vars.nginx.image.version>
         name: nginx
         ports:
