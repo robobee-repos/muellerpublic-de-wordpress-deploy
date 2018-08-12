@@ -109,12 +109,9 @@ spec:
           name: "mysql"
         <resourcesGroup(parent, vars, vars.db)>
         volumeMounts:
-        - mountPath: /bitnami/mariadb
+        - mountPath: /bitnami
           name: db
           subPath: db
-        - mountPath: /opt/bitnami/mariadb/logs
-          name: db
-          subPath: db_logs
         <mariadbReadinessProbe(parent, vars.db)>
       restartPolicy: Always
       volumes:
