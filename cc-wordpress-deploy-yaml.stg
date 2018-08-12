@@ -34,6 +34,9 @@
  * vars.wordpress.tolerations[].effect
  * vars.wordpress.tolerations[].key
  * vars.wordpress.tolerations[].value
+ * vars.wordpress.nginx.initialDelaySeconds
+ * vars.wordpress.nginx.httpHeaders[].name
+ * vars.wordpress.nginx.httpHeaders[].value
  * vars.nginx.limits.cpu
  * vars.nginx.limits.memory
  * vars.nginx.requests.cpu
@@ -47,6 +50,8 @@
 import "robobeerun-templates/_affinities.stg"
 import "robobeerun-templates/_resources.stg"
 import "robobeerun-templates/_tolerations.stg"
+import "robobeerun-templates/_nginx_config.stg"
+import "robobeerun-templates/_nginx_probe.stg"
 
 /*
  *
@@ -198,6 +203,7 @@ spec:
           subPath: html
         - mountPath: /nginx-in
           name: wordpress-nginx-config
+        <nginxReadinessProbe(parent, vars, vars.wordpress.nginx.initialDelaySeconds)>
       restartPolicy: Always
       volumes:
       - name: html
