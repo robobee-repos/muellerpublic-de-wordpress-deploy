@@ -1,10 +1,13 @@
 /*
  * Mandatory:
  *
- * vars.wordpress.nginx.hosts[]
+ * vars.hosts[]
  * vars.nginx.clientMaxBodySize
  *
  */
+
+import "robobeerun-templates/_ingress_config.stg"
+import "robobeerun-templates/_cert_config.stg"
 
 xx-wordpress-ingress-yaml(parent, vars) ::= <<
 ---
@@ -25,17 +28,17 @@ spec:
 
 ---
 
+<ingressService(vars.nginx, "wordpress-muellerpublic-de", "wordpress", "muellerpublic-de")>
+
+---
+
 apiVersion: certmanager.k8s.io/v1alpha1
 kind: Certificate
 metadata:
   name: wordpress-muellerpublic-de
   namespace: muellerpublic-de
 spec:
-  <certDefaultSpecProd(parent, vars, vars.wordpress.nginx, "wordpress-muellerpublic-de")>
-
----
-
-<ingressService(parent, vars, vars.wordpress.nginx, "muellerpublic-de", "wordpress", "wordpress-muellerpublic-de")>
+  <certDefaultSpecProd(vars.wordpress.nginx, "wordpress-muellerpublic-de")>
 
 ---
 
