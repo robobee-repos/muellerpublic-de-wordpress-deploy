@@ -24,7 +24,7 @@ metadata:
   annotations:
     <ingressDefaultAnnotations(vars.nginx)>
 spec:
-  <ingressDefaultSpec(vars, "wordpress-muellerpublic-de")>
+  <ingressDefaultSpec(vars.wordpress, "wordpress-muellerpublic-de")>
 
 ---
 
