@@ -116,6 +116,22 @@ data:
 
 ---
 
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wordpress-php-config-<vars.nginx.revision>
+  namespace: muellerpublic-de
+  labels:
+    app: wordpress
+    tier: frontend
+    group: muellerpublic-de
+data:
+  0_php.ini: |
+    upload_max_filesize = <vars.nginx.clientMaxBodySize>
+    post_max_size = <vars.nginx.clientMaxBodySize>
+
+---
+
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
@@ -192,6 +208,8 @@ spec:
         - mountPath: /var/www/html
           name: html
           subPath: html
+        - mountPath: /php-in
+          name: wordpress-php-config
         livenessProbe:
           tcpSocket:
             port: 9000
@@ -226,6 +244,9 @@ spec:
       - name: wordpress-nginx-config
         configMap:
           name: wordpress-nginx-config-<vars.nginx.revision>
+      - name: wordpress-php-config
+        configMap:
+          name: wordpress-php-config-<vars.nginx.revision>
       <tolerationMasterGroup(parent, vars, vars.wordpress.allowOnMaster)>
       <tolerationsGroup(parent, vars, vars.wordpress.tolerations, vars.wordpress.allowOnMaster)>
       <affinitiesGroup(parent, vars, vars.wordpress.affinity)>
