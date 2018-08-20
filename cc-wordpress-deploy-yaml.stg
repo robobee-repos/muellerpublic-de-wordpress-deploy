@@ -14,6 +14,7 @@
  * vars.wordpress.php.opcacheEnable
  * vars.wordpress.php.opcacheEnableCLI
  * vars.wordpress.php.opcacheMemoryConsumption
+ * vars.wordpress.hosts
  * vars.nginx.image.name
  * vars.nginx.image.version
  * vars.nginx.revision
@@ -34,6 +35,9 @@
  * vars.wordpress.tolerations[].effect
  * vars.wordpress.tolerations[].key
  * vars.wordpress.tolerations[].value
+ * vars.wordpress.nginx.initialDelaySeconds
+ * vars.wordpress.nginx.httpHeaders[].name
+ * vars.wordpress.nginx.httpHeaders[].value
  * vars.nginx.limits.cpu
  * vars.nginx.limits.memory
  * vars.nginx.requests.cpu
@@ -47,6 +51,8 @@
 import "robobeerun-templates/_affinities.stg"
 import "robobeerun-templates/_resources.stg"
 import "robobeerun-templates/_tolerations.stg"
+import "robobeerun-templates/_nginx_config.stg"
+import "robobeerun-templates/_nginx_probe.stg"
 
 /*
  *
@@ -77,7 +83,7 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: wordpress-nginx-config-<vars.wordpress.revision>
+  name: wordpress-nginx-config-<vars.nginx.revision>
   namespace: muellerpublic-de
   labels:
     app: nginx
@@ -87,12 +93,12 @@ data:
   nginx.conf: |
     <nginxDefaults(parent, vars, vars.nginx)>
     http {
-        <nginxHttpDefaults(parent, vars, vars.wordpress.nginx)>
-        <nginxVirtualHosts(parent, vars, vars.wordpress.nginx.hosts)>
+        <nginxHttpDefaults(parent, vars, vars.nginx)>
+        <nginxVirtualHosts(parent, vars, vars.wordpress.hosts)>
         server {
             listen 8080;
             listen [::]:8080;
-            server_name <first(vars.wordpress.nginx.hosts)>;
+            server_name <first(vars.wordpress.hosts)>;
             root /var/www/html;
             index index.php;
             <nginxLocationFavicon(parent, vars)>
@@ -107,6 +113,22 @@ data:
             <nginxLocationPhpPingLocation(parent, vars)>
         }
     }
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wordpress-php-config-<vars.nginx.revision>
+  namespace: muellerpublic-de
+  labels:
+    app: wordpress
+    tier: frontend
+    group: muellerpublic-de
+data:
+  0_php.ini: |
+    upload_max_filesize = <vars.nginx.clientMaxBodySize>
+    post_max_size = <vars.nginx.clientMaxBodySize>
 
 ---
 
@@ -186,6 +208,21 @@ spec:
         - mountPath: /var/www/html
           name: html
           subPath: html
+        - mountPath: /php-in
+          name: wordpress-php-config
+        livenessProbe:
+          tcpSocket:
+            port: 9000
+          initialDelaySeconds: <vars.wordpress.nginx.initialDelaySeconds>
+          periodSeconds: 60
+          timeoutSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: 9000
+          initialDelaySeconds: <vars.wordpress.nginx.initialDelaySeconds>
+          periodSeconds: 60
+          timeoutSeconds: 10
+          periodSeconds: 60
       - image: <vars.nginx.image.name>:<vars.nginx.image.version>
         name: nginx
         ports:
@@ -198,6 +235,7 @@ spec:
           subPath: html
         - mountPath: /nginx-in
           name: wordpress-nginx-config
+        <nginxReadinessProbe(parent, vars, vars.wordpress.nginx)>
       restartPolicy: Always
       volumes:
       - name: html
@@ -206,6 +244,9 @@ spec:
       - name: wordpress-nginx-config
         configMap:
           name: wordpress-nginx-config-<vars.nginx.revision>
+      - name: wordpress-php-config
+        configMap:
+          name: wordpress-php-config-<vars.nginx.revision>
       <tolerationMasterGroup(parent, vars, vars.wordpress.allowOnMaster)>
       <tolerationsGroup(parent, vars, vars.wordpress.tolerations, vars.wordpress.allowOnMaster)>
       <affinitiesGroup(parent, vars, vars.wordpress.affinity)>
@@ -255,7 +296,7 @@ spec:
           exec:
             command:
             - /readiness.sh
-            - /data/Rakefile
+            - /data/index.php
           initialDelaySeconds: 5
           timeoutSeconds: 1
         <resourcesGroup(parent, vars, vars.rsync)>
@@ -265,7 +306,7 @@ spec:
           subPath: html
       restartPolicy: Always
       volumes:
-      - name: html
+      - name: data
         persistentVolumeClaim:
           claimName: muellerpublic-de
       <affinitiesGroup(parent, vars, vars.wordpress.affinity)>

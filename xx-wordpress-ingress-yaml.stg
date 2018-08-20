@@ -1,10 +1,13 @@
 /*
  * Mandatory:
  *
- * vars.wordpress.nginx.hosts[]
+ * vars.hosts[]
  * vars.nginx.clientMaxBodySize
  *
  */
+
+import "robobeerun-templates/_ingress_config.stg"
+import "robobeerun-templates/_cert_config.stg"
 
 xx-wordpress-ingress-yaml(parent, vars) ::= <<
 ---
@@ -19,9 +22,13 @@ metadata:
     tier: frontend
     deployment: wordpress
   annotations:
-    <ingressDefaultAnnotations(parent, vars, vars.nginx)>
+    <ingressDefaultAnnotations(vars.nginx)>
 spec:
-  <ingressDefaultSpec(parent, vars, vars.wordpress.nginx, "wordpress-muellerpublic-de")>
+  <ingressDefaultSpec(vars.wordpress, "wordpress-muellerpublic-de")>
+
+---
+
+<ingressService(vars.nginx, "wordpress-muellerpublic-de", "wordpress", "muellerpublic-de")>
 
 ---
 
@@ -31,11 +38,7 @@ metadata:
   name: wordpress-muellerpublic-de
   namespace: muellerpublic-de
 spec:
-  <certDefaultSpecProd(parent, vars, vars.wordpress.nginx, "wordpress-muellerpublic-de")>
-
----
-
-<ingressService(parent, vars, vars.wordpress.nginx, "muellerpublic-de", "wordpress", "wordpress-muellerpublic-de")>
+  <certDefaultSpecProd(vars.wordpress, "wordpress-muellerpublic-de")>
 
 ---
 
