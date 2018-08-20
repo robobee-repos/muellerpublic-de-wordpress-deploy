@@ -1,0 +1,188 @@
+/*
+ * Mandatory:
+ *
+ * vars.db.image.name
+ * vars.db.image.version
+ *
+ * Optional:
+ *
+ * vars.db.limits.cpu
+ * vars.db.limits.memory
+ * vars.db.requests.cpu
+ * vars.db.requests.memory
+ * vars.db.affinity.key
+ * vars.db.affinity.name
+ * vars.db.affinity.required
+ * vars.db.allowOnMaster
+ * vars.db.tolerations[].effect
+ * vars.db.tolerations[].key
+ * vars.db.tolerations[].value
+ */
+
+import "robobeerun-templates/_mysql_probe.stg"
+import "robobeerun-templates/_affinities.stg"
+import "robobeerun-templates/_resources.stg"
+import "robobeerun-templates/_tolerations.stg"
+
+/*
+ *
+ */
+cc-db-deploy-yaml(parent, vars) ::= <<
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: muellerpublic-de
+  labels:
+    app: mariadb
+    tier: backend
+    group: muellerpublic-de
+spec:
+  ports:
+  - name: "mysql"
+    port: 3306
+    targetPort: 3306
+  selector:
+    app: mariadb
+
+---
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: mariadb
+  namespace: muellerpublic-de
+  labels:
+    app: mariadb
+    tier: backend
+    group: muellerpublic-de
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mariadb
+      tier: backend
+      group: muellerpublic-de
+  template:
+    metadata:
+      labels:
+        app: mariadb
+        tier: backend
+        group: muellerpublic-de
+    spec:
+      containers:
+      - image: <vars.db.image.name>:<vars.db.image.version>
+        name: mariadb
+        env:
+        - name: MYSQL_ALLOW_EMPTY_PASSWORD
+          value: "no"
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db
+              key: root_password
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: db
+              key: wordpress_db
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: db
+              key: wordpress_user
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db
+              key: wordpress_password
+        ports:
+        - containerPort: 3306
+          name: "mysql"
+        <resourcesGroup(parent, vars, vars.db)>
+        volumeMounts:
+        - mountPath: /var/lib/mysql
+          name: db
+          subPath: db
+        <mariadbReadinessProbe(parent, vars.db)>
+      restartPolicy: Always
+      volumes:
+      - name: db
+        persistentVolumeClaim:
+          claimName: muellerpublic-de
+      <tolerationMasterGroup(parent, vars, vars.db.allowOnMaster)>
+      <tolerationsGroup(parent, vars, vars.db.tolerations, vars.db.allowOnMaster)>
+      <affinitiesGroup(parent, vars, vars.db.affinity)>
+
+---
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: rsync-mariadb
+  namespace: muellerpublic-de
+  labels:
+    app: rsync-mariadb
+    tier: backup
+    group: muellerpublic-de
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: rsync-mariadb
+      tier: backup
+      group: muellerpublic-de
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: rsync-mariadb
+        tier: backup
+        group: muellerpublic-de
+    spec:
+      containers:
+      - image: <vars.rsync.image.name>:<vars.rsync.image.version>
+        name: rsync-mariadb
+        env:
+        - name: RSYNC_AUTHORIZED_KEY
+          valueFrom:
+            secretKeyRef:
+              name: rsync-ssh-<vars.rsync.ssh.revision>
+              key: auth-key
+        - name: USER
+          value: "root"
+        - name: RSYNC_STRICT_HOST_KEY_CHECKING_NO
+          value: "true"
+        ports:
+        - containerPort: 2222
+          name: ssh
+        readinessProbe:
+          exec:
+            command:
+            - /readiness.sh
+            - /data/data/aria_log_control
+          initialDelaySeconds: 5
+          timeoutSeconds: 1
+        <resourcesGroup(parent, vars, vars.rsync)>
+        volumeMounts:
+        - mountPath: /data
+          name: db
+          subPath: db
+        - mountPath: /mariadb_logs
+          name: db
+          subPath: db_logs
+      restartPolicy: Always
+      volumes:
+      - name: db
+        persistentVolumeClaim:
+          claimName: muellerpublic-de
+      <tolerationMasterGroup(parent, vars, vars.db.allowOnMaster)>
+      <tolerationsGroup(parent, vars, vars.db.tolerations, vars.db.allowOnMaster)>
+      <affinitiesGroup(parent, vars, vars.db.affinity)>
+
+---
+>>
