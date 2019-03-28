@@ -19,7 +19,9 @@
  * vars.mariadb.image.name
  * vars.mariadb.image.version
  * vars.mariadb.host
- *     The MariaDb host, for example 'mariadb.robobeerun-com-mariadb.svc:3306'.
+ *     The MariaDb host, for example 'mariadb.robobeerun-com-mariadb.svc'.
+ * vars.mariadb.port
+ *     The MariaDb port, for example '3306'.
  * 
  * vars.nginx.image.name
  * vars.nginx.image.version
@@ -151,10 +153,12 @@ spec:
         command:
         - sh
         - -c
-        - MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mysql -h $MARIADB_HOST -u $MARIADB_ROOT_USER -e "CREATE DATABASE IF NOT EXISTS $MARIADB_DATABASE; CREATE USER IF NOT EXISTS '${MARIADB_USER}'@'%' IDENTIFIED BY '$MARIADB_PASSWORD'; GRANT USAGE ON *.* TO '${MARIADB_USER}'@'%' IDENTIFIED BY '$MARIADB_PASSWORD'; GRANT ALL privileges ON $MARIADB_DATABASE.* TO '${MARIADB_USER}'@'%';";
+        - MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mysql -h $MARIADB_HOST -P $MARIADB_PORT -u $MARIADB_ROOT_USER -e "CREATE DATABASE IF NOT EXISTS $MARIADB_DATABASE; CREATE USER IF NOT EXISTS '${MARIADB_USER}'@'%' IDENTIFIED BY '$MARIADB_PASSWORD'; GRANT USAGE ON *.* TO '${MARIADB_USER}'@'%' IDENTIFIED BY '$MARIADB_PASSWORD'; GRANT ALL privileges ON $MARIADB_DATABASE.* TO '${MARIADB_USER}'@'%';";
         env:
         - name: MARIADB_HOST
           value: <vars.mariadb.host>
+        - name: MARIADB_PORT
+          value: <vars.mariadb.port>
         - name: MARIADB_ROOT_USER
           valueFrom:
             secretKeyRef:
@@ -200,7 +204,7 @@ spec:
               name: db
               key: wordpress_password
         - name: WORDPRESS_DB_HOST
-          value: <vars.mariadb.host>
+          value: <vars.mariadb.host>:<vars.mariadb.port>
         - name: PHP_MEMORY_LIMIT
           value: "<vars.wordpress.php.memoryLimit>"
         - name: PHP_MAX_EXECUTION_TIME
