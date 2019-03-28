@@ -273,6 +273,7 @@ spec:
 
 ---
 
+<if(vars.rsync)>
 apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
@@ -334,5 +335,6 @@ spec:
       <tolerationsGroup(parent, vars, vars.wordpress.tolerations, vars.wordpress.allowOnMaster)>
 
 ---
+<endif>
 
 >>
