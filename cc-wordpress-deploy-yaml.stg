@@ -15,6 +15,12 @@
  * vars.wordpress.php.opcacheEnableCLI
  * vars.wordpress.php.opcacheMemoryConsumption
  * vars.wordpress.hosts
+ * 
+ * vars.mariadb.image.name
+ * vars.mariadb.image.version
+ * vars.mariadb.host
+ *     The MariaDb host, for example 'mariadb.robobeerun-com-mariadb.svc:3306'.
+ * 
  * vars.nginx.image.name
  * vars.nginx.image.version
  * vars.nginx.revision
@@ -65,11 +71,11 @@ apiVersion: v1
 kind: Service
 metadata:
   name: wordpress
-  namespace: muellerpublic-de
+  namespace: www-muellerpublic-de
   labels:
     app: wordpress
     tier: frontend
-    group: muellerpublic-de
+    deployment: www-muellerpublic-de
 spec:
   ports:
   - name: "http"
@@ -84,11 +90,11 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: wordpress-nginx-config-<vars.nginx.revision>
-  namespace: muellerpublic-de
+  namespace: www-muellerpublic-de
   labels:
     app: nginx
     tier: frontend
-    group: muellerpublic-de
+    deployment: www-muellerpublic-de
 data:
   nginx.conf: |
     <nginxDefaults(parent, vars, vars.nginx)>
@@ -120,25 +126,60 @@ apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   name: wordpress
-  namespace: muellerpublic-de
+  namespace: www-muellerpublic-de
   labels:
     app: wordpress
     tier: frontend
-    group: muellerpublic-de
+    deployment: www-muellerpublic-de
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: wordpress
       tier: frontend
-      group: muellerpublic-de
+      deployment: www-muellerpublic-de
   template:
     metadata:
       labels:
         app: wordpress
         tier: frontend
-        group: muellerpublic-de
+        deployment: www-muellerpublic-de
     spec:
+      initContainers:
+      - name: init-db
+        image: <vars.mariadb.image.name>:<vars.mariadb.image.version>
+        command:
+        - sh
+        - -c
+        - MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mysql -h $MARIADB_HOST -u $MARIADB_ROOT_USER -e "CREATE DATABASE IF NOT EXISTS $MARIADB_DATABASE; CREATE USER IF NOT EXISTS '${MARIADB_USER}'@'%' IDENTIFIED BY '$MARIADB_PASSWORD'; GRANT USAGE ON *.* TO '${MARIADB_USER}'@'%' IDENTIFIED BY '$MARIADB_PASSWORD'; GRANT ALL privileges ON $MARIADB_DATABASE.* TO '${MARIADB_USER}'@'%';";
+        env:
+        - name: MARIADB_HOST
+          value: <vars.mariadb.host>
+        - name: MARIADB_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              name: db
+              key: root_user
+        - name: MARIADB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db
+              key: root_password
+        - name: MARIADB_USER
+          valueFrom:
+            secretKeyRef:
+              name: db
+              key: wordpress_user
+        - name: MARIADB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db
+              key: wordpress_password
+        - name: MARIADB_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: db
+              key: wordpress_db
       containers:
       - image: <vars.wordpress.image.name>:<vars.wordpress.image.version>
         name: wordpress
@@ -158,6 +199,8 @@ spec:
             secretKeyRef:
               name: db
               key: wordpress_password
+        - name: WORDPRESS_DB_HOST
+          value: <vars.mariadb.host>
         - name: PHP_MEMORY_LIMIT
           value: "<vars.wordpress.php.memoryLimit>"
         - name: PHP_MAX_EXECUTION_TIME
@@ -182,8 +225,6 @@ spec:
           value: "<vars.wordpress.php.opcacheEnableCLI>"
         - name: PHP_OPCACHE_MEMORY_CONSUMPTION
           value: "<vars.wordpress.php.opcacheMemoryConsumption>"
-        - name: WORDPRESS_DB_HOST
-          value: "db:3306"
         ports:
         - containerPort: 9000
           name: "php"
@@ -194,13 +235,13 @@ spec:
           subPath: html
         livenessProbe:
           tcpSocket:
-            port: 9000
+            port: php
           initialDelaySeconds: <vars.wordpress.nginx.initialDelaySeconds>
           periodSeconds: 60
           timeoutSeconds: 10
         readinessProbe:
           tcpSocket:
-            port: 9000
+            port: php
           initialDelaySeconds: <vars.wordpress.nginx.initialDelaySeconds>
           periodSeconds: 60
           timeoutSeconds: 10
@@ -222,7 +263,7 @@ spec:
       volumes:
       - name: html
         persistentVolumeClaim:
-          claimName: muellerpublic-de
+          claimName: www-muellerpublic-de
       - name: wordpress-nginx-config
         configMap:
           name: wordpress-nginx-config-<vars.nginx.revision>
@@ -236,18 +277,18 @@ apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
   name: rsync-wordpress
-  namespace: muellerpublic-de
+  namespace: www-muellerpublic-de
   labels:
     app: rsync-wordpress
     tier: backup
-    group: muellerpublic-de
+    deployment: www-muellerpublic-de
 spec:
   replicas: 0
   selector:
     matchLabels:
       app: rsync-wordpress
       tier: backup
-      group: muellerpublic-de
+      deployment: www-muellerpublic-de
   strategy:
     type: Recreate
   template:
@@ -255,7 +296,7 @@ spec:
       labels:
         app: rsync-wordpress
         tier: backup
-        group: muellerpublic-de
+        deployment: www-muellerpublic-de
     spec:
       containers:
       - image: <vars.rsync.image.name>:<vars.rsync.image.version>
@@ -287,7 +328,7 @@ spec:
       volumes:
       - name: data
         persistentVolumeClaim:
-          claimName: muellerpublic-de
+          claimName: www-muellerpublic-de
       <affinitiesGroup(parent, vars, vars.wordpress.affinity)>
       <tolerationMasterGroup(parent, vars, vars.wordpress.allowOnMaster)>
       <tolerationsGroup(parent, vars, vars.wordpress.tolerations, vars.wordpress.allowOnMaster)>
