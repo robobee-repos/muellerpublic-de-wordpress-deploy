@@ -43,9 +43,10 @@
  * vars.wordpress.tolerations[].effect
  * vars.wordpress.tolerations[].key
  * vars.wordpress.tolerations[].value
- * vars.wordpress.nginx.initialDelaySeconds
- * vars.wordpress.nginx.httpHeaders[].name
- * vars.wordpress.nginx.httpHeaders[].value
+ * 
+ * vars.nginx.initialDelaySeconds
+ * vars.nginx.httpHeaders[].name
+ * vars.nginx.httpHeaders[].value
  * vars.nginx.limits.cpu
  * vars.nginx.limits.memory
  * vars.nginx.requests.cpu
@@ -240,13 +241,13 @@ spec:
         livenessProbe:
           tcpSocket:
             port: php
-          initialDelaySeconds: <vars.wordpress.nginx.initialDelaySeconds>
+          initialDelaySeconds: <vars.nginx.initialDelaySeconds>
           periodSeconds: 60
           timeoutSeconds: 10
         readinessProbe:
           tcpSocket:
             port: php
-          initialDelaySeconds: <vars.wordpress.nginx.initialDelaySeconds>
+          initialDelaySeconds: <vars.nginx.initialDelaySeconds>
           periodSeconds: 60
           timeoutSeconds: 10
           periodSeconds: 60
@@ -262,7 +263,7 @@ spec:
           subPath: html
         - mountPath: /nginx-in
           name: wordpress-nginx-config
-        <nginxReadinessProbe(parent, vars, vars.wordpress.nginx)>
+        <nginxReadinessProbe(parent, vars, vars.nginx)>
       restartPolicy: Always
       volumes:
       - name: html
