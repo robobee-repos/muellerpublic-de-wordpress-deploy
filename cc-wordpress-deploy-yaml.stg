@@ -3,6 +3,7 @@
  *
  * vars.wordpress.image.name
  * vars.wordpress.image.version
+ * vars.wordpress.revision
  * vars.wordpress.php.memoryLimit
  * vars.wordpress.php.maxExecutionTime
  * vars.wordpress.php.maxChildren
@@ -14,18 +15,20 @@
  * vars.wordpress.php.opcacheEnable
  * vars.wordpress.php.opcacheEnableCLI
  * vars.wordpress.php.opcacheMemoryConsumption
- * vars.wordpress.hosts
+ * vars.wordpress.hosts[]
  * 
- * vars.mariadb.image.name
- * vars.mariadb.image.version
- * vars.mariadb.host
- *     The MariaDb host, for example 'mariadb.robobeerun-com-mariadb.svc'.
- * vars.mariadb.port
- *     The MariaDb port, for example '3306'.
+ * vars.db.host
+ *     The MySQL host, for example 'robobeerun-com-mariadb.robobeerun-com-mariadb.svc'.
+ * vars.db.port
+ *     The MySQL port, for example '3306'.
  * 
  * vars.nginx.image.name
  * vars.nginx.image.version
- * vars.nginx.revision
+ * vars.nginx.workerProcesses
+ * vars.nginx.workerConnections
+ * vars.nginx.clientMaxBodySize
+ * vars.nginx.readTimeout
+ * 
  * vars.rsync.image.name
  * vars.rsync.image.version
  * vars.rsync.ssh.revision
@@ -43,14 +46,16 @@
  * vars.wordpress.tolerations[].effect
  * vars.wordpress.tolerations[].key
  * vars.wordpress.tolerations[].value
+ * vars.wordpress.livenessProbe.initialDelaySeconds
+ * vars.wordpress.readinessProbe.initialDelaySeconds
+ * vars.wordpress.httpHeaders[].name
+ * vars.wordpress.httpHeaders[].value
  * 
- * vars.nginx.initialDelaySeconds
- * vars.nginx.httpHeaders[].name
- * vars.nginx.httpHeaders[].value
  * vars.nginx.limits.cpu
  * vars.nginx.limits.memory
  * vars.nginx.requests.cpu
  * vars.nginx.requests.memory
+ * 
  * vars.rsync.limits.cpu
  * vars.rsync.limits.memory
  * vars.rsync.requests.cpu
@@ -58,10 +63,12 @@
  */
 
 import "robobeerun-templates/_affinities.stg"
-import "robobeerun-templates/_resources.stg"
-import "robobeerun-templates/_tolerations.stg"
+import "robobeerun-templates/_cert_config.stg"
+import "robobeerun-templates/_ingress_config.stg"
 import "robobeerun-templates/_nginx_config.stg"
 import "robobeerun-templates/_nginx_probe.stg"
+import "robobeerun-templates/_tolerations.stg"
+import "robobeerun-templates/mysql_init.stg"
 
 /*
  *
@@ -78,7 +85,6 @@ metadata:
   labels:
     app: wordpress
     tier: frontend
-    deployment: www-muellerpublic-de
 spec:
   ports:
   - name: "http"
@@ -92,22 +98,21 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: wordpress-nginx-config-<vars.nginx.revision>
+  name: wordpress-nginx-<vars.wordpress.revision>
   namespace: www-muellerpublic-de
   labels:
     app: nginx
     tier: frontend
-    deployment: www-muellerpublic-de
 data:
   nginx.conf: |
     <nginxDefaults(parent, vars, vars.nginx)>
     http {
         <nginxHttpDefaults(parent, vars, vars.nginx)>
-        <nginxVirtualHosts(parent, vars, vars.nginx.hosts)>
+        <nginxVirtualHosts(parent, vars, vars.wordpress.hosts)>
         server {
-            listen 8080;
-            listen [::]:8080;
-            server_name <first(vars.nginx.hosts)>;
+            listen 8080 default_server;
+            listen [::]:8080 default_server;
+            server_name <first(vars.wordpress.hosts)>;
             root /var/www/html;
             index index.php;
             <nginxLocationFavicon(parent, vars)>
@@ -125,6 +130,24 @@ data:
 
 ---
 
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress-php
+  namespace: www-muellerpublic-de
+  labels:
+    app: wordpress
+    tier: frontend
+spec:
+  ports:
+  - name: "php"
+    port: 9000
+    targetPort: 9000
+  selector:
+    app: wordpress
+
+---
+
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
@@ -133,58 +156,20 @@ metadata:
   labels:
     app: wordpress
     tier: frontend
-    deployment: www-muellerpublic-de
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: wordpress
       tier: frontend
-      deployment: www-muellerpublic-de
   template:
     metadata:
       labels:
         app: wordpress
         tier: frontend
-        deployment: www-muellerpublic-de
     spec:
       initContainers:
-      - name: init-db
-        image: <vars.mariadb.image.name>:<vars.mariadb.image.version>
-        command:
-        - sh
-        - -c
-        - MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mysql -h $MARIADB_HOST -P $MARIADB_PORT -u $MARIADB_ROOT_USER -e "CREATE DATABASE IF NOT EXISTS $MARIADB_DATABASE; CREATE USER IF NOT EXISTS '${MARIADB_USER}'@'%' IDENTIFIED BY '$MARIADB_PASSWORD'; GRANT USAGE ON *.* TO '${MARIADB_USER}'@'%' IDENTIFIED BY '$MARIADB_PASSWORD'; GRANT ALL privileges ON $MARIADB_DATABASE.* TO '${MARIADB_USER}'@'%';";
-        env:
-        - name: MARIADB_HOST
-          value: "<vars.mariadb.host>"
-        - name: MARIADB_PORT
-          value: "<vars.mariadb.port>"
-        - name: MARIADB_ROOT_USER
-          valueFrom:
-            secretKeyRef:
-              name: db
-              key: root_user
-        - name: MARIADB_ROOT_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: db
-              key: root_password
-        - name: MARIADB_USER
-          valueFrom:
-            secretKeyRef:
-              name: db
-              key: wordpress_user
-        - name: MARIADB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: db
-              key: wordpress_password
-        - name: MARIADB_DATABASE
-          valueFrom:
-            secretKeyRef:
-              name: db
-              key: wordpress_db
+      <mysqlInitDbGroup(vars.db)>
       containers:
       - image: <vars.wordpress.image.name>:<vars.wordpress.image.version>
         name: wordpress
@@ -192,20 +177,20 @@ spec:
         - name: WORDPRESS_DB_NAME
           valueFrom:
             secretKeyRef:
-              name: db
-              key: wordpress_db
+              name: db-<vars.db.revision>
+              key: database
         - name: WORDPRESS_DB_USER
           valueFrom:
             secretKeyRef:
-              name: db
-              key: wordpress_user
+              name: db-<vars.db.revision>
+              key: user
         - name: WORDPRESS_DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: db
-              key: wordpress_password
+              name: db-<vars.db.revision>
+              key: password
         - name: WORDPRESS_DB_HOST
-          value: <vars.mariadb.host>:<vars.mariadb.port>
+          value: "<vars.db.host>:<vars.db.port>"
         - name: PHP_MEMORY_LIMIT
           value: "<vars.wordpress.php.memoryLimit>"
         - name: PHP_MAX_EXECUTION_TIME
@@ -233,52 +218,40 @@ spec:
         ports:
         - containerPort: 9000
           name: "php"
+        <tcpProbesPortGroup(vars.wordpress, "php")>
         <resourcesGroup(parent, vars, vars.wordpress)>
         volumeMounts:
         - mountPath: /var/www/html
           name: html
           subPath: html
-        livenessProbe:
-          tcpSocket:
-            port: php
-          initialDelaySeconds: <vars.nginx.initialDelaySeconds>
-          periodSeconds: 60
-          timeoutSeconds: 10
-        readinessProbe:
-          tcpSocket:
-            port: php
-          initialDelaySeconds: <vars.nginx.initialDelaySeconds>
-          periodSeconds: 60
-          timeoutSeconds: 10
-          periodSeconds: 60
       - image: <vars.nginx.image.name>:<vars.nginx.image.version>
         name: nginx
         ports:
         - containerPort: 8080
           name: "http"
+        <nginxReadinessProbe(parent, vars, vars.wordpress)>
         <resourcesGroup(parent, vars, vars.nginx)>
         volumeMounts:
         - mountPath: /var/www/html
           name: html
           subPath: html
         - mountPath: /nginx-in
-          name: wordpress-nginx-config
-        <nginxReadinessProbe(parent, vars, vars.nginx)>
+          name: nginx-nginx-config
       restartPolicy: Always
       volumes:
       - name: html
         persistentVolumeClaim:
           claimName: www-muellerpublic-de
-      - name: wordpress-nginx-config
+      - name: nginx-nginx-config
         configMap:
-          name: wordpress-nginx-config-<vars.nginx.revision>
+          name: wordpress-nginx-<vars.wordpress.revision>
+      <affinitiesGroup(parent, vars, vars.wordpress.affinity)>
       <tolerationMasterGroup(parent, vars, vars.wordpress.allowOnMaster)>
       <tolerationsGroup(parent, vars, vars.wordpress.tolerations, vars.wordpress.allowOnMaster)>
-      <affinitiesGroup(parent, vars, vars.wordpress.affinity)>
 
 ---
 
-apiVersion: apps/v1beta2
+apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   name: rsync-wordpress
@@ -286,14 +259,14 @@ metadata:
   labels:
     app: rsync-wordpress
     tier: backup
-    deployment: www-muellerpublic-de
+    group: interscalar-com
 spec:
   replicas: 0
   selector:
     matchLabels:
       app: rsync-wordpress
       tier: backup
-      deployment: www-muellerpublic-de
+      group: interscalar-com
   strategy:
     type: Recreate
   template:
@@ -301,7 +274,7 @@ spec:
       labels:
         app: rsync-wordpress
         tier: backup
-        deployment: www-muellerpublic-de
+        group: interscalar-com
     spec:
       containers:
       - image: <vars.rsync.image.name>:<vars.rsync.image.version>
@@ -326,7 +299,7 @@ spec:
           timeoutSeconds: 1
         <resourcesGroup(parent, vars, vars.rsync)>
         volumeMounts:
-        - mountPath: "/var/www/html"
+        - mountPath: /data
           name: data
           subPath: html
       restartPolicy: Always

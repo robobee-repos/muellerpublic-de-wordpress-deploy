@@ -7,7 +7,5 @@ kind: Namespace
 apiVersion: v1
 metadata:
   name: www-muellerpublic-de
-  labels:
-    deployment: www-muellerpublic-de
 
 >>

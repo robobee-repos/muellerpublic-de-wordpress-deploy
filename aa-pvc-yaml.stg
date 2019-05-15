@@ -13,8 +13,6 @@ kind: PersistentVolumeClaim
 metadata:
   name: www-muellerpublic-de
   namespace: www-muellerpublic-de
-  labels:
-    deployment: www-muellerpublic-de
 <if(vars.volume.class)>
   annotations:
     volume.beta.kubernetes.io/storage-class: <vars.volume.class>
