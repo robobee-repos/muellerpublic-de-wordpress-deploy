@@ -70,6 +70,7 @@ import "robobeerun-templates/_nginx_probe.stg"
 import "robobeerun-templates/_tolerations.stg"
 import "robobeerun-templates/_resources.stg"
 import "robobeerun-templates/mysql_init.stg"
+import "robobeerun-templates/tcp_probe.stg"
 
 /*
  *
