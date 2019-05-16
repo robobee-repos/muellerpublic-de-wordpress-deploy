@@ -68,6 +68,7 @@ import "robobeerun-templates/_ingress_config.stg"
 import "robobeerun-templates/_nginx_config.stg"
 import "robobeerun-templates/_nginx_probe.stg"
 import "robobeerun-templates/_tolerations.stg"
+import "robobeerun-templates/_resources.stg"
 import "robobeerun-templates/mysql_init.stg"
 
 /*
