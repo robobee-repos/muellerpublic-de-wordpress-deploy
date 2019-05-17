@@ -1,19 +1,22 @@
 /*
  * Mandatory:
  *
- * vars.volume.class
  * vars.volume.storage
+ * 
+ * Optional:
+ * 
+ * vars.volume.class
  */
 aa-pvc-yaml(parent, vars) ::= <<
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: muellerpublic-de
-  namespace: muellerpublic-de
-  labels:
-    group: muellerpublic-de
+  name: www-muellerpublic-de
+  namespace: www-muellerpublic-de
+<if(vars.volume.class)>
   annotations:
     volume.beta.kubernetes.io/storage-class: <vars.volume.class>
+<endif>
 spec:
   accessModes:
   - ReadWriteMany
