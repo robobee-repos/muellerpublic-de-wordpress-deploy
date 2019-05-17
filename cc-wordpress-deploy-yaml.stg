@@ -268,7 +268,6 @@ spec:
     matchLabels:
       app: rsync-wordpress
       tier: backup
-      group: interscalar-com
   strategy:
     type: Recreate
   template:
@@ -276,7 +275,6 @@ spec:
       labels:
         app: rsync-wordpress
         tier: backup
-        group: interscalar-com
     spec:
       containers:
       - image: <vars.rsync.image.name>:<vars.rsync.image.version>
