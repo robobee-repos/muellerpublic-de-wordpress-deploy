@@ -253,6 +253,24 @@ spec:
 
 ---
 
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress-exporter
+  namespace: www-muellerpublic-de
+  labels:
+    app: wordpress-exporter
+    tier: metrics
+spec:
+  ports:
+  - name: "metrics"
+    port: 8888
+    targetPort: 8888
+  selector:
+    app: wordpress-exporter
+
+---
+
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
