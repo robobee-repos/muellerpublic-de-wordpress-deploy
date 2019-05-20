@@ -253,6 +253,79 @@ spec:
 
 ---
 
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress-exporter
+  namespace: www-muellerpublic-de
+  labels:
+    app: wordpress-exporter
+    tier: metrics
+spec:
+  ports:
+  - name: "metrics"
+    port: 8888
+    targetPort: 8888
+  selector:
+    app: wordpress-exporter
+
+---
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: wordpress-exporter
+  namespace: www-muellerpublic-de
+  labels:
+    app: wordpress-exporter
+    tier: metrics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wordpress-exporter
+      tier: metrics
+  template:
+    metadata:
+      labels:
+        app: wordpress-exporter
+        tier: metrics
+    spec:
+      containers:
+      - image: erwin82/wordpress_exporter:latest
+        name: wordpress-exporter
+        env:
+        - name: WORDPRESS_DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: db-<vars.db.revision>
+              key: database
+        - name: WORDPRESS_DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-<vars.db.revision>
+              key: user
+        - name: WORDPRESS_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-<vars.db.revision>
+              key: password
+        - name: WORDPRESS_DB_HOST
+          value: "<vars.db.host>"
+        - name: WORDPRESS_DB_PORT
+          value: "<vars.db.port>"
+        ports:
+        - containerPort: 8888
+          name: "metrics"
+        <tcpProbesPortGroup(vars.exporter, "metrics")>
+        <resourcesGroup(parent, vars, vars.exporter)>
+      restartPolicy: Always
+      <affinitiesGroup(parent, vars, vars.wordpress.affinity)>
+      <tolerationMasterGroup(parent, vars, vars.wordpress.allowOnMaster)>
+      <tolerationsGroup(parent, vars, vars.wordpress.tolerations, vars.wordpress.allowOnMaster)>
+
+---
+
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
@@ -268,7 +341,6 @@ spec:
     matchLabels:
       app: rsync-wordpress
       tier: backup
-      group: interscalar-com
   strategy:
     type: Recreate
   template:
@@ -276,7 +348,6 @@ spec:
       labels:
         app: rsync-wordpress
         tier: backup
-        group: interscalar-com
     spec:
       containers:
       - image: <vars.rsync.image.name>:<vars.rsync.image.version>
